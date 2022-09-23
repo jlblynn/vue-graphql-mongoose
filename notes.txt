@@ -1,0 +1,2958 @@
+##Initializing Apollo Server 2
+
+In server.js bring in the 'apollo-server' package:
+
+  const { ApolloServer } = require("apollo-server");
+
+This will initialize the GraphQL server within our app.
+Initialize that server and pass in an empty object for now:
+
+  const server = new ApolloServer({});
+
+Assign its return value to 'server' and call the listen method on it:
+
+  server.listen();
+
+Now we can run our server.
+In package.json it shows we can run our server with "npm run server".
+When we run we get an error:
+
+  'Apollo Server requires either an existing schema or typeDefs'
+
+ We need a root Query type in our typeDefs.
+ It can't just be left empty as Query {}.
+ typeDefs needs a type Query and it has to have one defined query within it.
+ We need to both tell GraphQL what our data looks like and what we're going to do with that data.
+ That's intent behind describing the data in the first place through type definitions--to do something with it.
+
+ So lets add some data, an array of todos objects:
+
+  const todos = [
+    { task: 'Wash car', completed: false },
+    { task: 'Clean room', completed: true }
+  ];
+
+Then add the typeDefs.
+They are a way of telling the Apollo Server the different types of data within our app.
+Bring in a 'gql' package: 
+
+  const { ApolloServer, gql } = require("apollo-server");
+
+Create the typeDefs using the gql package.
+Describe the data within the backticks.
+We have 2 types of data within each todos object, a string and a boolean value:
+
+  const typeDefs = gql`
+    type Query {
+      task: String
+      completed: Boolean
+    }
+  `;
+
+Pass typeDefs to the ApolloServer with a name and value of typeDefs:
+
+  const server = new ApolloServer({
+    typeDefs
+  });
+
+On the listen method add a then callback function to log the server:
+
+  server.listen().then(({ url }) => {
+    console.log(`Server listening on ${url}`);
+  });
+
+We can change the port by adding an arg to the listen method.
+
+##Adding resolvers and executing queries in GraphQL Playground
+
+How do we get data in GrapgQL?
+There is a 'Query' type that lets us request data.
+Then we provide functions to the query type.
+We want to return the type Todo.
+It's an array so we use the square brackets:
+
+  const typeDefs = gql`
+    type Todo {
+      task: String
+      completed: Boolean
+    }
+    type Query {
+      getTodos: [Todo]
+    }
+  `;
+
+Create an object called 'resolvers' that will use the Query.
+Within the Query provide the name and then the value will specify how to get those todos.
+Create a function that returns the todos:
+
+  const resolvers = {
+    Query: {
+      getTodos: () => todos;
+    }
+  };
+
+Tell the ApolloServer by passing in resolvers:
+
+  const server = new ApolloServer({
+    typeDefs,
+    resolvers
+  });
+
+Then in the GrapgQL Playground we get get all of our todos.
+First include the keyword query.
+Then we add the name of our function getTodos.
+Then we get an error as we have to specify what values we want returned.
+So on the right hand side if we click on 'schema' then we see we have 'task' and 'completed':
+
+  query {
+    getTodos {
+      task
+      completed
+    }
+  }
+
+Then when we run it we get all the the todos data returned:
+
+  {
+    "data": {
+      "getTodos": [
+        {
+          "task": "Wash car",
+          "completed": false
+        },
+        {
+          "task": "Clean room",
+          "completed": true
+        }
+      ]
+    }
+  }
+
+GrapgQL Playground makes it easy to figure out how to return specific data.
+FYI for queries we don't have to write query.
+
+##Writing and running first mutation in GrapgQL Playground
+
+How to add to new data.
+We can do this with a mutation type that is used to change data.
+Inside the mutation create a new function.
+That function needs some data and we will pass it the task and completed properties.
+With GrapgQL we need to specify their types as well.
+Then we specify what needs to be returned, whoch is the Todo that was added to the array:
+
+  const typeDefs = gql`
+    type Todo {
+      task: String
+      completed: Boolean
+    }
+    type Query {
+      getTodos: [Todo]
+    }
+    type Mutation {
+      addTodo(task: String, completed: Boolean): Todo
+    }
+  `;
+
+In the resolvers add a mutation property object.
+Just like with the Query we add a function to the object.
+Pass in a root/parent value as the first arg, but we will just use a '_' as we won;t make use of it now.
+2nd param is where we get access to our args, which will be returned as an object.
+Now we can construct the todo we want to push to the array.
+Declare the todo object task and completed values.
+Then push it to the todo array.
+Return the todo array:
+
+  const resolvers = {
+    Query: {
+      getTodos: () => todos;
+    },
+    Mutation: {
+      addTodo: (_, args) => {
+        const todo = { task: args.task, completed: args.completed };
+        todos.push(todo);
+        return todo;
+      }
+    }
+  };
+
+A refactored way:
+
+  const resolvers = {
+    Query: {
+      getTodos: () => todos;
+    },
+    Mutation: {
+      addTodo: (_, { task, completed}) => {
+        const todo = { task, completed };
+        todos.push(todo);
+        return todo;
+      }
+    }
+  };
+
+Now in the GrapgQL Playground schema there should be a mutations list.
+So to add a new todo specify a mutation.
+Then use the addTodo function.
+Then specify the args we need to provide 'task' and 'completed'.
+Then we have to return something, which will be properties off of this todo type:
+
+  mutation {
+    addTodo(task: "Eat lunch", completed: false) {
+      task
+      completed
+    }
+  }
+
+Then when we run it we see the object we just added.
+Then is we use the getTodos query we should see the new todo in the array.
+
+##Create mLab DB, connect to GrapgQL
+
+Delete everything in server.js so that it looks like this:
+
+  const { ApolloServer, gql } = require("apollo-server");
+
+  const typeDefs = gql`
+    type Todo {
+      task: String
+      completed: Boolean
+    }
+
+    type Query {
+      getTodos: [Todo]
+    }
+  `;
+
+  const server = new ApolloServer({
+    typeDefs
+  });
+
+  server.listen().then(({ url }) => {
+    console.log(`Server listening on ${url}`);
+  });
+
+Create a DB and user on mLab.
+Once set up create a 'variables.env' file.
+Inside that create a variable for the DB address:
+
+MONGO_URI=mongodb://<dbusername>:<dbpassword>@ds245805.mlab.com:45805/fullstack-vue-graphql
+
+Then back in server.js we need to use the mongoose package to connect to mLab.
+Require in mongoose: 
+
+  const mongoose = require('mongoose');
+
+Then to read from the private variables.env file require in 'dotenv' and configure the path:
+
+  require('dotenv').config({ path: 'variables.env' });
+
+Then use the mongoose connect method and pass in the MONGO_URI.
+Create a call back for connection status:
+
+  mongoose
+    .connect(process.env.MONGO_URI)
+    .then(() => console.log('DB connected'))
+    .catch(err => console.error(err));
+
+If we run the server there is a deprication warning.
+It says to use the new parser, pass option { useNewUrlParser: true } to MongoClient.connect:
+
+  mongoose
+    .connect(process.env.MONGO_URI, { useNewUrlParser: true })
+    .then(() => console.log('DB connected'))
+    .catch(err => console.error(err));
+
+Now if we try again it should run fine.
+
+##Creating Mongoose schemas
+
+Create a models folder.
+This is where the the schemas that desribe the data to mongodb.
+We will have user and post data so create a User.js and a Post.js file inside.
+
+Starting with the User model, require in mongoose.
+Create a new UserSchema that will contain all the fields of data we desire.
+Trim removes whitespace.
+The avatar will be a url string.
+For the favorites property we create a type of an ObjectId that is automatically created by mLab.
+The ref is referencing the other model we are yet to create.
+Then we export this model out as 'User':
+
+  const mongoose = require('mongoose');
+
+  const UserSchema = new mongoose.Schema({
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true
+    },
+    email: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    password: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    avatar: {
+      type: String
+    },
+    joinDate: {
+      type: Date,
+      default: Date.now
+    },
+    favorites: {
+      type: [mongoose.Schema.Types.ObjectId],
+      required: true,
+      ref: 'Post'
+    }
+  });
+
+  module.exports = mongoose.model('User', UserSchema);
+
+Then do the same for the Post schema.
+The messages property will be an array of associated messages:
+
+  const mongoose = require('mongoose');
+
+  const PostSchema = new mongoose.Schema({
+    title: {
+      type: String,
+      required: true
+    },
+    imageUrl: {
+      type: String,
+      required: true
+    },
+    categories: {
+      type: [String],
+      required: true
+    },
+    description: {
+      type: String,
+      required: true
+    },
+    createdDate: {
+      type: Date,
+      default: Date.now
+    },
+    likes: {
+      type: Number,
+      default: 0
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: 'User'
+    },
+    messages: [{
+      messageBody: {
+        type: String,
+        required: true
+      },
+      messageDate: {
+        type: Date,
+        default: Date.now
+      },
+      messageUser: {
+        type: mongoose.Schema.Types.ObjectId,
+        required: true,
+        ref: 'User'
+      }
+    }]
+  });
+
+  module.exports = mongoose.model('Post', PostSchema);
+
+In server.js above where we connect, require in the User and Post models:
+
+  const User = require('./models/User');
+  const Post = require('./models/Post');
+
+Then we need to make them available to the ApolloServer with a context object:
+
+  const server = new ApolloServer({
+    typeDefs,
+    context: {
+      User,
+      Post
+    }
+  });
+
+When running the server I get the error:
+
+  DeprecationWarning: collection.ensureIndex is deprecated. Use createIndexes instead.
+
+After some searching, autoIndex set to false fixed the error: 
+
+  mongoose.connect(url, { useNewUrlParser: true, autoIndex: false })
+
+##Creating typeDefs for Project
+
+We have descibed the data to mLab and now it is time to do the same for GrapgQL.
+We need to create typeDefs, which are basically a schema in GrapgQL.
+Remove the current typeDefs we have in server.js.
+Instead we will have a dedicated file called 'typeDefs.gql'.
+Inside that we need to create graphql versions of our current User and Post schemas.
+
+Staring with the User model, create a complex object.
+Set an _id property with a type of 'ID'.
+It represents the automatically created ID that mongodb creates for data added to the databse.
+A '!' means that it is required.
+@unique means it has to be unique.
+Theres no built in time or data in graphql so just use a string.
+For favorites it will be an array of the type Post:
+
+  type User {
+    _id: ID
+    username: String! @unique
+    email: String!
+    password: String!
+    avatar: String
+    joinDate: String
+    favorites: [Post]
+  }
+
+Then do the same for the Post model.
+Note that instead of 'Number' use 'Int'.
+For messages we need to create a seperate type:
+
+  type Post {
+    title: String!
+    imageUrl: String!
+    categories: [String]!
+    description: String!
+    createdDate: String
+    likes: Int
+    createdBy: User!
+    messages: [Message]
+  }
+
+Then create the Message type:
+
+  type Message {
+    _id: ID
+    messageBody: String!
+    messageDate: String
+    messageUser: User!
+  }
+
+Now we've converted both of the models to graphql syntax.
+In server.js we need some packages to make sense of the gql files.
+Require in 'fs' and 'path'.
+Create a 'filePath' variable to join the current directory with typeDefs.gql.
+Then pass this file to the fs readFileSync function, where the 2nd arg is the encoding:
+
+  const fs = require('fs');
+  const path = require('path');
+
+  const filePath = path.join(__dirname, 'typedefs.gql');
+  const typeDefs = fs.readFileSync(filePath, 'utf-8');
+
+When running the server I get an error: 
+
+  Error: Query root type must be provided.
+
+Adding a Query type to the typeDefs file seems to work:
+
+  type Query {
+    user(_id: ID!): User
+  }
+
+##Write and run addPost mutation
+
+Use resolvers to add some functionality.
+Pass the resolvers property name to the ApolloServer:
+
+  const server = new ApolloServer({
+    typeDefs,
+    resolvers,
+    context: {
+      User,
+      Post
+    }
+  });
+
+Create a 'resolvers.js' file.
+This will be the functionality for fetching, adding, changing data etc with the db.
+Export it as an object and add a Mutation property name:
+
+  module.exports = {
+    Mutation:
+  }
+
+Then in typeDefs.gql add a Mutation with a function 'signupUser'.
+So in our user model, they are required to provide a username, email, and password.
+We need to pass these to the function, also telling graphql what type the are.
+Specify after the colon that we want to return the User:
+
+  type Mutation {
+    signupUser(username: String!, email: String!, password: String!): User!
+  }
+
+Back in the resolvers file, provide the Mutation with the signupUser function.
+It will be an async await function.
+1st arg is a root or parent value but we won't use that.
+2nd arg is the args specified in our typedef.
+We can use object destructuring to get access to those properties.
+3rd arg is context.
+This is the object we passed to the apollo server that contains our mongoose models.
+We will use the User model.
+The last param is 'info' but we won't use that.
+In the body of the function we check to se if there is already a user with the provided username.
+If that returns true then throw an error.
+Otherwise add that newUser by adding the provided properties by saving to the db.
+Then return that new user as we specified in the typedefs mutation.
+To make sure there are no errors provide a Query property object that returns null:
+
+  module.exports = {
+    Query: {
+      getUser: () => null
+    },
+    Mutation: {
+      signupUser: async (_, { username, email, password }, { User }) => {
+        const user = await User.findOne({username});
+        if (user) {
+          throw new Error('Username already exists');
+        }
+        const newUser = await new User({
+          username,
+          email,
+          password
+        }).save();
+        return newUser;
+      }
+    }
+  }
+
+Then in typeDefs provide it with that query:
+
+  type Query {
+    getUser: User
+  }
+
+In server.js import the resolvers object:
+
+  const resolvers = require("./resolvers");
+
+Run the server and in GrapgQL use this mutation.
+When specifying the values you have to use double quotes.
+We need to specify what properties from the User type we want to return:
+
+  mutation {
+    signupUser(username: "Josh", email: "josh@gmail.com", password: "1234") {
+      username
+      email
+      password
+      avatar
+      joinDate
+    }
+  }
+
+What we should see returned is:
+
+  {
+    "data": {
+      "signupUser": {
+        "username": "Josh",
+        "email": "josh@gmail.com",
+        "password": "1234",
+        "avatar": null,
+        "joinDate": "Tue Dec 18 2018 12:05:48 GMT+0800 (W. Australia Standard Time)"
+      }
+    }
+  }
+
+Now in mLab there should be a new collection of users:
+
+  {
+      "_id": {
+          "$oid": "5c18721cf6c308262895ddfd"
+      },
+      "favorites": [],
+      "username": "Josh",
+      "email": "josh@gmail.com",
+      "password": "1234",
+      "joinDate": {
+          "$date": "2018-12-18T04:05:48.792Z"
+      },
+      "__v": 0
+  }
+
+##Write and run addPost mutation
+
+In typeDefs.gql add the addPost mutation.
+Our Post model requires title, imageUrl, categories, description, and createdBy.
+Instead of the 'createdBy' value we will call it 'creatorId'.
+In Post.js we specified that createdBy had a type of ObjectId.
+This will be used to get info of a user that created a given post by passing to it the id of the user.
+We pass to it the id that is automatically created by mongodb.
+Then we return the Post:
+
+  type Mutation {
+    addPost(title: String!, imageUrl: String!, categories: [String]!, description: String!, creatorId: ID!): Post!
+    signupUser(username: String!, email: String!, password: String!): User!
+  }
+
+Then in the resolvers file create the functionality for this.
+Use an async function.
+Specify the param properties using destructuring.
+Then the Post model for the context object.
+Create a newPost variable with a constructor function.
+Pass in the property names but for the createdBy pass it the value of creatorId.
+Then save it and return the newPost:
+
+  addPost: async (_, { title, imageUrl, categories, description, creatorId }, { Post }) => {
+    const newPost = await new Post({
+      title,
+      imageUrl,
+      categories,
+      description,
+      createdBy: creatorId
+    }).save();
+    return newPost;
+  }
+
+In GraphQL we should see the new typedef in our schema.
+Create a new post by adding our user id as the creatorId.
+Then specify the properties to return:
+
+  mutation {
+    addPost(
+      title: "Mona Lisa"
+      imageUrl: "google.com"
+      categories: ["Art"]
+      description: "A famous painting"
+      creatorId: "5c18721cf6c308262895ddfd"
+    ) {
+      title
+      imageUrl
+      categories
+      description
+      createdDate
+      likes
+    }
+  }
+
+Then in mlab there should be a post collection:
+
+  {
+      "_id": {
+          "$oid": "5c187ca823cad42428507a82"
+      },
+      "categories": [
+          "Art"
+      ],
+      "likes": 0,
+      "title": "Mona Lisa",
+      "imageUrl": "google.com",
+      "description": "A famous painting",
+      "createdBy": {
+          "$oid": "5c18721cf6c308262895ddfd"
+      },
+      "createdDate": {
+          "$date": "2018-12-18T04:50:48.051Z"
+      },
+      "messages": [],
+      "__v": 0
+  }
+
+##Write and run getPosts query and Intro to populate
+
+Let's replace our Query resolver with one that gets posts.
+In the typeDefs file declare a getPosts function that takes in no args and returns an array of posts:
+
+  type Query {
+    getPosts: [Post]
+  }
+
+Then in the resolvers file write an async function to get the posts.
+Once again pass _ ass the root value.
+We don't use args and can't use _ again as it will error so just pass 'args'.
+Pass the Post context.
+Create a posts variable.
+Use the find method and the sort method on the Post model.
+Then use the populate method to use the ObjectId's.
+The createdBy property returns a User that uses an ObjectId.
+It will turn the ObjectId into a User object.
+Specify a path/field of createdBy, and the model that we want the ObjectId turned into which is User.
+So a property (createdBy) is equal to the path and the ref (User) is equal to the model.
+Then at the end return the posts:
+
+  Query: {
+    getPosts: async (_, args, { Post }) => {
+      const posts = await Post.find({}).sort({ createdDate: 'desc' }).populate({
+        path: 'createdBy',
+        model: 'User'
+      });
+      return posts;
+    }
+  }
+
+In GraphQL we should see a getPosts query.
+So now we can return all posts and then all the information related to the User that created it:
+
+  {
+    getPosts {
+      title
+      imageUrl
+      categories
+      description
+      createdDate
+      likes
+      createdBy {
+        _id
+        username
+        email
+        password
+        joinDate
+      }
+    }
+  }
+
+Running it should return:
+
+  {
+    "data": {
+      "getPosts": [
+        {
+          "title": "Mona Lisa",
+          "imageUrl": "https://images.duckduckgo.com/iu/?u=http%3A%2F%2Fwww.readingpublicmuseum.org%2Fexhibit_secrets-of-mona-lisa-4.jpg&f=1",
+          "categories": [
+            "Art"
+          ],
+          "description": "A famous painting",
+          "createdDate": "Tue Dec 18 2018 12:50:48 GMT+0800 (W. Australia Standard Time)",
+          "likes": 0,
+          "createdBy": {
+            "_id": "5c18721cf6c308262895ddfd",
+            "username": "Josh",
+            "email": "josh@gmail.com",
+            "password": "1234",
+            "joinDate": "Tue Dec 18 2018 12:05:48 GMT+0800 (W. Australia Standard Time)"
+          }
+        }
+      ]
+    }
+  }
+
+##Connect Vue CLient with Vue-CLI 3
+
+Make sure you have a node version later than v8.9.
+Install vue:
+
+  npm install -g @vue/cli
+
+Then to create your project we can use a GUI (graphical user interface):
+
+  vue ui
+
+CLick on create, then if in the right directory click create a new project here.
+Call the project folder 'client'.
+Set npm for the package manager.
+Don't overide target folder or create a git repo.
+Select manual preset.
+Select babel, router, and vuex.
+Select history mode for the router.
+Then it will install the project.
+
+##Adding plugins with the Vue GUI and Concurrently Dev Script
+
+Once we have created the project the CLI shows us a page that has our plugins.
+It allows us to install plugins to help speed up making an app.
+To show this page simply run:
+
+  vue uni
+
+We want to run the server and client script at the same time.
+So make sure you in the root folder and enter:
+
+  npm run dev 
+
+##Installing Vuetify Plugin and Generating a theme
+
+The CSS framework we will use if Vuetify JS.
+A component based framework.
+
+Navigate to the client folder:
+
+  vue add vuetify
+
+No for premade template.
+No to custom theme.
+No to the la carte.
+Yes to babel/polyfil.
+
+Then we can create a theme using the online tool:
+
+  https://vuetifyjs.com/en/theme-generator
+
+Once we have made a theme export it.
+Copy the object and then go to the vuetify.js file.
+In the Vue object at the bottom create a 'theme' property and paste the object into it"
+
+  Vue.use(Vuetify, {
+    iconfont: 'md',
+    theme: {
+      primary: "#80D8FF",
+      secondary: "#E0E0E0",
+      accent: "#1DE9B6",
+      error: "#E65100",
+      warning: "#FFD54F",
+      info: "#7C4DFF",
+      success: "#00C853"
+    }
+  })
+
+To apply the theme to the template we need to include in App.vue:
+
+  <template>
+    <v-app></v-app>
+  </template>
+
+Then to apply a style in Home.vue:
+
+  <v-btn color="primary">Button</v-btn>
+
+If we don't want to have hex colours then we can use the vuetify names.
+When exporting the theme click 'use names'.
+Then use the import link provided and then paste the object into the Vue object as before.
+
+##Horizontal Navbar and Mobile First design
+
+For our design, the app component will always be present on all the pages.
+
+In App.vue add <v-toolbar> tags inside of the <v-app> tags in the template.
+Add <v-toolbar-side-icon> tags which will later be a button.
+Add <v-toolbar-title> tags for displaying the title of the app:
+
+  <template>
+    <v-app>
+      <!-- Horizontal Navbar -->
+      <v-toolbar fixed color="primary" dark>
+        <v-toolbar-side-icon></v-toolbar-side-icon>
+        <v-toolbar-title>
+          VueShare
+        </v-toolbar-title>
+      </v-toolbar>
+
+      <!-- App Content -->
+      <main>
+        <router-view/>
+      </main>
+    </v-app>
+  </template>
+
+To make 'VueShare' a link wrap it in <router-link> tags.
+Declare where it goes to.
+Give it a 'tag="span"' to make the text white.
+Then declare the cursor as the default isn't good:
+
+  <router-link to="/" tag="span" style="cursor: pointer">
+    VueShare
+  </router-link>
+
+Underneath the title add <v-spacer> tags to add some margin.
+Here we will add a search input.
+Add <v-text-field> tags which will display a search icon and have a search bar:
+
+  <v-text-field flex prepend-icon="search" placeholder="Search posts" color="accent" single-line hide-details></v-text-field>
+
+Add another <v-spacer> tag underneath.
+Add <v-toolbar-items> tags for the navbar links.
+Create a v-for to loop over the navbar links from an array:
+
+  <v-toolbar-items>
+    <v-btn flat v-for="item in horizontalNavItems">
+    </v-btn>
+  </v-toolbar-items>
+
+Then we need to make that array in a computed property:
+
+  <script>
+    export default {
+      name: 'App',
+      computed: {
+        horizontalNavItems() {
+          return [
+            { icon: 'chat', title: 'Posts', link: '/posts'},
+            { icon: 'lock_open', title: 'Sign In', link: '/signin'},
+            { icon: 'create', title: 'Sign Up', link: '/signup'}
+          ]
+        }
+      }
+    }
+  </script>
+
+Then in the v-for we need to bind a key to it.
+Then bind the to link:
+
+  <v-btn flat v-for="item in horizontalNavItems" :key="item.title" :to="item.link">
+
+Inside the <v-btn> tag interpolate through the button icon and text:
+
+  <v-toolbar-items>
+    <v-btn flat v-for="item in horizontalNavItems" :key="item.title" :to="item.link">
+      <v-icon left>{{ item.icon }}</v-icon>
+      {{ item.title }}
+    </v-btn>
+  </v-toolbar-items>
+
+We don't have a mobile first design at the moment.
+Add a class to hide the title on a small display:
+
+  <v-toolbar-title class="hidden-xs-only">
+
+Hide the icons on a small screen:
+
+  <v-icon class="hidden-sm-only" left>{{ item.icon }}</v-icon>
+
+Hide the items for xs displays:
+
+  <v-toolbar-items class="hidden-xs-only">
+
+The 'Home' component needs to have some nicer margin.
+In App.vue put the <router-view/> tag inside of a <v-container> with top margin of 4:
+
+  <v-container class="mt-4">
+    <router-view/>
+  </v-container>
+
+Then in Home.vue put the h1 element inside of a <v-container> as well:
+
+  <v-container>
+    <h1>Home</h1>
+  </v-container>
+
+##Add Side Navbar
+
+In the App component above the horizontal navbar add <v-navigation-drawer> tags.
+This drawer we can show or hide.
+Give it properties of app, temporary and fixed.
+To toggle it in and out of view use the v-model attribute with a data property of 'sideNav':
+
+  <v-navigation-drawer app temporary fixed v-model="sideNav">
+  </v-navigation-drawer>
+
+Then add the sideNav data property:
+
+  data() {
+    return {
+      sideNav: false
+    }
+  }
+
+Then to toggle it add a click event called toggleSideNav:
+
+  <v-toolbar-side-icon @click="toggleSideNav"></v-toolbar-side-icon>
+
+Create this method.
+If it is true then it will be displayed:
+
+  methods: {
+    toggleSideNav() {
+      this.sideNav = !this.sideNav;
+    }
+  }
+
+So now clicking the hamburger icon shows the sideNav but to hide it we have to click off it.
+Then add a title to the sideNav:
+
+  <v-navigation-drawer app temporary fixed v-model="sideNav">
+    <v-toolbar color="accent" dark flat>
+      <v-toolbar-side-icon @click="toggleSideNav"></v-toolbar-side-icon>
+      <router-link to="/" tag="span" style="cursor: pointer">
+        <h1 class="title pl-3">VueShare</h1>
+      </router-link>
+    </v-toolbar>
+  </v-navigation-drawer>
+
+So now we have a title for the sideNav and the sideNav disappears when the hamburger icon is clicked.
+Put <v-divider> tags below to display a line.
+Now we will add some links.
+Use <v-list> tags and inside them use the v-for directive to display the items.
+Inside of the <v-list> tags add <v-list-tile> tags to display the items.
+Inside of that create <v-list-tile-action> tags to hold and display the list icon.
+Under this create <v-list-tile-content> tags to put the title property:
+
+  <v-list>
+    <v-list-tile v-for="item in sideNavItems" :key="item.title" :to="item.link">
+      <v-list-tile-action>
+        <v-icon>{{ item.icon }}</v-icon>
+      </v-list-tile-action>
+      <v-tile-content>
+        {{ item.title }}
+      </v-tile-content>
+    </v-list-tile>
+  </v-list>
+
+Use a sideNavItems computed property:
+
+  sideNavItems() {
+    return [
+      { icon: 'chat', title: 'Posts', link: '/posts'},
+      { icon: 'lock_open', title: 'Sign In', link: '/signin'},
+      { icon: 'create', title: 'Sign Up', link: '/signup'}
+    ]
+  }
+
+##Adding routing and page transitions
+
+In the components directory create an 'Auth' and 'Posts' folder.
+In the Posts folder create an 'AddPost.vue', 'Posts.vue' file.
+In the Auth folder create an 'Profile.vue', 'Signin.vue', and 'Signup.vue'.
+
+In router.js import these components.
+Then add the routes:
+
+  routes: [
+    {
+      path: '/',
+      name: 'home',
+      component: Home
+    },
+    {
+      path: '/posts',
+      name: 'Posts',
+      component: Posts
+    },
+    {
+      path: '/post/add',
+      name: 'AddPost',
+      component: AddPost
+    },
+    {
+      path: '/profile',
+      name: 'Profile',
+      component: Profile
+    },
+    {
+      path: '/signin',
+      name: 'Signin',
+      component: Signin
+    },
+    {
+      path: '/signup',
+      name: 'Signup',
+      component: Signup
+    }
+  ]
+
+Now the navigation buttons should work.
+Open up the App component.
+In the <main> tags wrap the <router-view/> tag in <transition> tags.
+Give the transition a name of 'fade':
+
+  <transition name="fade">
+    <router-view/>
+  </transition>
+
+Then add some style tags down the bottom.
+Specify the name, then either 'enter' or 'leave'.
+'active' specifies that is will occur over the entire transition.
+This tells the transition the property we want to change and the transition duration.
+Then we can tell it the beginning and end state of the transition, telling it we want the opacity to be 0 when it starts.
+
+  <style>
+    .fade-enter-active,
+    .fade-leave-active {
+      transition-property: opacity;
+      transition-duration: 0.25s;
+    }
+
+    .fade-enter-active {
+      transition-delay: 0.25s;
+    }
+    
+    .fade-enter,
+    .fade-leave-active {
+      opacity: 0;
+    }
+  </style>
+
+##Setting up Apollo Client / Vue Apollo, Firing getPosts Query from Client
+
+cd into the client folder:
+
+  npm i apollo-boost vue-apollo 
+
+apollo-boost makes it handy for using apollo with javascript applications.
+vue-apollo provides a nice api.
+
+In main.js import:
+
+  import ApolloClient from 'apollo-boost'
+  import VueApollo from 'vue-apollo'
+
+Next tell vue about apollo:
+
+  Vue.use(VueApollo);
+
+Setup apollo client.
+Pass in a configuration object.
+uri lets us connect the front end to the backend, so we let it know where to fetch data from.
+Add graphql to the end of the address:
+
+  const defaultClient = new ApolloClient({
+    uri: 'http://localhost:4000/graphql'
+  });
+
+Create a apolloProvider variable.
+We pass in the instantiated apollo client to VueApollo: 
+
+  const apolloProvider = new VueApollo({ defaultClient });
+
+Then in the new Vue object create a 'provide' property.
+Give it a value of apolloProvider.provide() which will inject apollo to all of our vue files:
+
+  new Vue({
+    provide: apolloProvider.provide(),
+    router,
+    store,
+    render: h => h(App)
+  }).$mount('#app')
+
+cd to the root of the app.
+Then run the dev script to check for errors:
+
+  npm run dev
+
+**I'm getting this warning, not sure of fix yet: 
+
+  [Vue warn]: Unknown custom element: <v-tile-content> - did you register the component correctly? For recursive components, make sure to provide the "name" option.
+
+Open up the Home component and lets fire a query event to get some data from the backend.
+In the script add a property called apollo.
+We can use this apollo property within any vue component.
+In typeDefs we only have the getPosts query so we'll use that.
+It will be an object and we will specify we want it to be a query.
+Then we need to specify how to execute it.
+We can do this by using gql.
+Import gql from apollo-boost.
+Then in the query use the gql back ticks to send off a query to the back end.
+Specify the getPosts function and then the fields we want to be returned:
+
+  import { gql } from 'apollo-boost';
+
+  export default {
+    name: "home",
+    apollo: {
+      getPosts: {
+        query: gql`
+          query {
+            getPosts {
+              _id
+              title
+              imageUrl
+              description
+            }
+          }
+        `
+      }
+    }
+  }
+
+When we want to output this returned data to the template we can use the v-for directive:
+
+  <ul v-for="post in getPosts" :key="post._id">
+    <li>
+      {{ post.title }}
+      {{ post.imageUrl }}
+      {{ post.description }}
+    </li>
+  </ul>
+
+Now when we are on the Home component we should see the data returned as a list item:
+
+  Mona Lisa https://images.duckduckgo.com/iu/?u=http%3A%2F%2Fwww.readingpublicmuseum.org%2Fexhibit_secrets-of-mona-lisa-4.jpg&f=1 A famous painting
+
+##Dive into Smart Queries in Vue components
+The way we previously executed the query for getPosts in the apollo syntax is known as a smart query.
+With a smart query there is a lot more information available to us.
+
+Let's create a "loading" message for when the query is being executed:
+
+  <div v-if="$apollo.loading">Loading...</div>
+  <ul v-else v-for="post in getPosts" :key="post._id">
+    <li>
+      {{ post.title }}
+      {{ post.imageUrl }}
+      {{ post.description }}
+    </li>
+  </ul>
+
+You can slow down the connection speed in dev tools to test this out.
+
+Some other features are a 'result' and 'error' property that can be used in the apollo data object.
+More info can be found here:
+
+  https://akryum.github.io/vue-apollo/api/smart-query.html
+
+##Executing queries with the ApolloQuery component
+Delete the query in the Home component.
+We will replace it with an ApolloQuery component.
+
+Copy the Apollo object in the script.
+Delete it, then create a data object.
+Create a 'getPostsQuery' and inside the gql back ticks paste in the getPosts object:
+
+  export default {
+    name: "home",
+    data () {
+      return {
+        getPostsQuery: gql`
+          query {
+            getPosts {
+              _id
+              title
+              imageUrl
+              description
+              likes
+            }
+          }
+        `
+      }
+    }
+  }
+
+Then in the template add some <ApolloQuery> tags.
+Pass in the name of the query we want to run.
+We can get access to the returned data by using "slot-scope" attribute with a template.
+A slot is when we want to provide a component with a reusable slot that can access data from the child component.
+Then we can access information with a result object which we can destructure with the loading, error, networkStatus and data value.
+As before we can access loading, networkStatus and error and control what is displayed for it.
+Then we can loop through the data property which will be on the function getPosts.
+Include a key for the post._id's.
+Then interpolate all the values we want returned:
+
+  <ApolloQuery :query="getPostsQuery">
+    <template slot-scope="{ result: { loading, error, data, networkStatus } }">
+      <div v-if="loading">Loading...</div>
+      <div v-else-if="error">Error! {{ error.message }}</div>
+      <div v-else-if="!loading">Network Status: {{ networkStatus }}</div>
+      <ul v-else v-for="post on data.getPosts" :key="post._id">
+        <li>
+          {{ post.title }}
+          {{ post.imageUrl }}
+          {{ post.likes }}
+        </li>
+      </ul>
+    </template>
+  </ApolloQuery>
+
+##Add Carousel component to Home page
+Another way of checking to see if our query is resolved if by saying v-if on the parent element.
+Remove the ApolloQuery that we just made.
+Add <v-container> tags with a v-if getPosts attribute.
+Inside that use <v-flex> tags with an attribute to tell all the child elements to use all the available space.
+Inside that add a <v-carousel> component.
+Then we want to cycle through every image in the carousel component every 3 seconds.
+Inside that have <v-carousel-item> tags which will iterate over every item in the carousel.
+Bind the source value to post.imageUrl:
+
+  <v-container v-if="getPosts">
+
+    <v-flex text-xs-center xs12>
+      <v-carousel v-bind="{ 'cycle': true }" interval="3000">
+        <v-carousel-item v-for="post in getPosts" :key="post._id" :src="post.imageUrl">
+          <h1 id="carousel__title">{{ post.title }}</h1>
+        </v-carousel-item>
+      </v-carousel>
+    </v-flex>
+
+  </v-container>
+
+  <style>
+    #carousel__title {
+      position: absolute;
+      background-color: rgba(0, 0, 0, 0.5);
+      color: white;
+      border-radius: 5px 5px 0 0;
+      padding: 0.5em;
+      margin: 0 auto;
+      left: 0;
+      right: 0;
+    }
+  </style>
+
+##Firing getPosts action with vuex
+Delete the getPosts smart query.
+Comment out everything inside the <v-container> tags.
+
+We will use state management by using the vuex store.
+Instead of an Apollo pbject make a methods object.
+Create a handleGetCarouselPosts method.
+
+Actions are properties on an object.
+In store.js add getPosts to the actions.
+In the function use ApolloClient to fire the getPosts query.
+
+Export the defaultClient in main.js.
+Import it into store.js and rename it as apolloClient:
+
+  import { defaultClient as apolloClient } from './main'
+
+Back in the getPosts action put the query method on it.
+It will accept a configuration object with a query property.
+For this we need to use gql backticks so import apollo-boost.
+Back inside the query property use the query keyword.
+Specify getPosts as the query we want.
+Inside that choose the fields that we want to be returned.
+This will be an asynchronous action to chain on a then statement.
+Log the data within the then statement.
+After add a catch statement to log any errors:
+
+  actions: {
+    getPosts: () => {
+    apolloClient
+      .query({
+        query: gql`
+          query {
+            getPosts {
+              _id
+              title
+              imageUrl
+            }
+          }
+        `
+      }).then(data => {
+        console.log(data)
+      })
+      .catch(err => {
+        console.log(err)
+      })
+    }
+  }
+
+Then we need to call this getPosts from the Home component.
+'store' is passed to the app as its being initialized so we have access to it.
+So in the Home component handleGetCarouselPosts method access the store with this.$store.
+Then we use the dispatch method to perform an action, which is getPosts as a string:
+
+  methods: {
+    handleGetCarouselPosts() {
+      this.$store.dispatch("getPosts")
+    }
+  }
+
+Then to execute the method we use the created lifecycle hook.
+When the component is created we run handleGetCarouselPosts:
+
+  created() {
+    this.handleGetCarouselPosts()
+  }
+
+If we run the app and open dev tools we should see the data being returned.
+
+##Using mutations and getters
+We need to get the data being returned into the Home component.
+
+In our then statement in store.js we are loggin the data.
+To log the getPosts function we would log data.data.getPosts .
+A better way is to destructure the data object we get back:
+
+  }).then(({ data }) => {
+    console.log(data.getPosts)
+  })
+
+Now in the console we should see just the array of getPosts.
+We want to get this data into the carousel component.
+
+In store.js create a posts array in the state object.
+We want to update that post property in the state.
+Passing in 'commit' allows us to pass data from an action to a mutation function.
+So pass in commit to the getPosts action as an arg.
+In the then statement add a commit function.
+The first arg is the name of the function.
+Second arg is the data we are sending:
+
+  actions: {
+    getPosts: ({ commit }) => {
+    apolloClient
+      .query({
+        query: gql`
+          query {
+            getPosts {
+              _id
+              title
+              imageUrl
+            }
+          }
+        `
+      }).then(({ data }) => {
+        commit('setPosts', data.getPosts)
+        console.log(data.getPosts)
+      })
+      .catch(err => {
+        console.log(err)
+      })
+    }
+  }
+
+Then create the setPosts mutation.
+It has two params of state and payload.
+We can update the posts property on the state object in a synchronous way:
+
+  mutations: {
+    setPosts: (state, payload) => {
+      state.posts = payload
+    }
+  }
+
+If we now use the vue dev tools we should see a state with a posts property.
+The state object has been updated the mutation is passing data from the action to the state.
+Now we need a way to pass data from the state to the component.
+
+Getters get data from the state object.
+Create one in store.js with a property name of posts.
+It will accept the state object and will return state.posts :
+
+  getters: {
+    posts: state => state.posts
+  }
+
+Now in the Home component create a computed property called posts.
+Then return the posts from the store using the getter:
+
+  computed: {
+    posts() {
+      return this.$store.getters.posts
+    }
+  }
+
+Uncomment the flex component.
+Instead of iterating over posts in getPosts, we use posts.
+
+Right now we won't see an image even though it has been updated.
+So we need to check if there are posts in the posts array:
+
+  <v-container text-xs-center>
+    <v-flex xs12>
+      <v-carousel v-if="posts.length > 0" v-bind="{ 'cycle': true }" interval="3000">
+        <v-carousel-item v-for="post in posts" :key="post._id" :src="post.imageUrl">
+          <h1 id="carousel__title">{{post.title}}</h1>
+        </v-carousel-item>
+      </v-carousel>
+    </v-flex>
+  </v-container>
+
+##Add loading property, loading spinner and mapGetters
+In state.js create a new loading property in the state and set it to false.
+We will update it in the getPosts action by committing a mutation function 'setLoading' and setting it a value of true:
+
+  commit('setLoading', true)
+
+Create the setLoading mutation that accepts state and the payload of true.
+Then set the loading property to true:
+
+  setLoading: (state, payload) => {
+    state.loading = payload
+  }
+
+Once we have data returned we want to stop the loading.
+So in the then statement set the setLoading to false to update the state:
+
+  }).then(({ data }) => {
+    commit('setPosts', data.getPosts)
+    commit('setLoading', false)
+  })
+
+Do the same in the catch block:
+
+  .catch(err => {
+    commit('setLoading', false)
+    console.log(err)
+  })
+
+Now create a getter for setLoading.
+It's going to take the state object and take the state property off of it:
+
+  getters: {
+    posts: state => state.posts,
+    loading: state => state.loading
+  }
+
+To show it in the Home component create a loading computed property:
+
+  loading() {
+    return this.$store.getters.loading
+  }
+
+Now lets create a spinner to show that it's loading:
+
+  <v-layout row>
+    <v-dialog v-model="loading" persistent fullscreen>
+      <v-container fill-height>
+        <v-layout row justify-center align-center>
+          <v-progress-circular indeterminate :size="70" :width="7" color="secondary">
+          </v-progress-circular>
+        </v-layout>
+      </v-container>
+    </v-dialog>
+  </v-layout>
+
+Then add the loading property to the carousel.
+Check if loading resloves to false then display the carousel:
+
+  <v-carousel v-if="!loading && posts.length > 0" v-bind="{ 'cycle': true }" interval="3000">
+
+Now we should briefly see a spinner when the page is reloaded.
+
+A better way for us to use the getters is to use the mapGetters function.
+It allows us to include all the getters in a single function.
+Import mapGetters and add the getters to the mapGetters operator:
+
+  import { mapGetters } from "vuex";
+
+  computed: {
+    ...mapGetters(["loading", "posts"])
+  }
+
+##Create queries.js for clientside query / mutation definitions.
+Create a queries.js file.
+Cut the gql import from store.js to queries.js .
+Cut the getPosts typeDefs from store.js and paste in into a const that we will export to the store can access it:
+
+  export const GET_POSTS = gql`
+    query {
+      getPosts {
+        _id
+        title
+        imageUrl
+      }
+    }
+  `
+
+Import this variable to the store:
+
+  import { GET_POSTS } from './queries'
+
+Then in the getPosts query, set the query equal to GET_POSTS:
+
+  .query({
+    query: GET_POSTS
+  })
+
+##Create Gravatar avatar and hash user password on signup
+In our user on mlab we hae 2 issues.
+We don't have an avatar and we can see the users password.
+
+In User.js we will setup some pre-save-hooks that occur before it is sent to the mongoose model.
+Before we save a new user to the db we run a function.
+It will automatically create an avatar image for the user.
+We need a random string so require md5:
+
+  const md5 = require('md5');
+
+We want to set the avatar and need to use backticks as we need to use template literals in the string.
+Then we interpolate a random string at the end of the url with md5.
+md5 is a function and can accept an arg so we will pass in the username as it is unique.
+Then we use next to pass control to the next function:
+
+  UserSchema.pre('save', function(next) {
+    this.avatar = `http://gravatar.com/avatar/${md5(this.username)}?d=identicon`;
+    next();
+  })
+
+Now if someone has access to our db we want to hash the password so they cannot see it.
+We use another presave hook.
+Import the package bcrypt:
+
+  const bcrypt = require('bcrypt');
+
+If the password field isn't modified (signing up a user, providing a value for password that wan't there before) then return next.
+Otherwise generate salt.
+If there is an error return next and pass that error.
+Otherwise if there is no error call the hash method on bcrypt to hash the password.
+If there is an error return the next function and pass the error.
+Otherwise set the password equal to the hash.
+Then return the next function:
+
+  UserSchema.pre('save', function(next) {
+    if (!this.isModified("password")) {
+      return next();
+    }
+    bcrypt.genSalt(10, (err, salt) => {
+      if (err) return next(err);
+
+      bcrypt.hash(this.password, salt, (err, hash) => {
+        if (err) return next(err);
+
+        this.password = hash;
+        next();
+      });
+    });
+  });
+
+So in the terminal run the server:
+
+  npm run server
+
+This will provide a link to the graphql playground.
+Then if we go to history we can select the signupUser mutation.
+Modify the username, email, and password, then run it:
+
+  mutation {
+    signupUser(username: "secondUser", email: "secondUser@gmail.com", password: "secondUser") {
+      username
+      email
+      password
+      avatar
+      joinDate
+    }
+  }
+
+This will create a new user and we should see a avatar and a hashed password:
+
+  {
+    "data": {
+      "signupUser": {
+        "username": "secondUser",
+        "email": "secondUser@gmail.com",
+        "password": "$2b$10$Nbg2kUOFf/ucIselSnUpLOT.CQzIIAM64d2YCm5HTg1tmDFPtwhvK",
+        "avatar": "http://gravatar.com/avatar/34759ffd1c64d8b5617a4e74e1958af5?d=identicon",
+        "joinDate": "Wed Jan 09 2019 16:18:48 GMT+0800 (W. Australia Standard Time)"
+      }
+    }
+  }
+
+##Write and run signinUser mutation
+Create a new mutation to signin a user.
+In typeDefs create a signinUser typedef.
+It will accept 2 required args of username and password that are both strings.
+It will return that user:
+
+  signinUser(username: String!, password: String!): User!
+
+Create the functionality for this in the resolvers file.
+Make a signupUser mutation and destructure username and password from our args argument.
+And destructure User from the context argument.
+Find the user with User.findOne with their unique username.
+If no user is returned then throw a new error.
+
+Otherwise we need to compare the password they entered to the hashed one in the db.
+Require in bcrypt.
+Create a new variable that uses bcrypt to compare the typed in password and the one stored in the db.
+If it isn't a valid password throw a new error.
+Otherwise return the user:
+
+  signinUser: async (_, { username, password }, { User }) => {
+    const user = await User.findOne({ username });
+    if (!user) {
+      throw new Error('User not found');
+    }
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      throw new Error('Invalid Password');
+    }
+    return user;
+  }
+
+Then by running this mutation in GraphQL we can check that it is working.
+
+##Sign token and return it upon signin/signup
+Instead of returning the user when signing in we want to return a token that we can use to authenticate the users session.
+In typeDefs create a Token.
+Give it a property of token and a type of String!
+This will be what's known as a JSON web token:
+
+  type Token {
+    token: String!
+  }
+
+Replace the returned value for signinUser and signupUser with the Token.
+
+In the resolvers file we want the functions to create and return a JSON web token.
+Import the jwt package:
+
+  const jwt = require('jsonwebtoken');
+
+At the top of the file create a function for this.
+Pass in the params user, secret, and expiresIn.
+We will use the jwt package and run the sign method on it.
+It will sign the token based on the username and the email.
+We can pass this in by destructuring the user.
+Then we can pass them in as the first param to the sign method.
+Second param is the secret.
+Third param is an expiresIn object:
+
+  const createToken = (user, secret, expiresIn) => {
+    const { username, email } = user;
+    return jwt.sign({ username, email }, secret, { expiresIn });
+  }
+
+In the signinUser resolver remove the return user at the end.
+Instead return an object with the property of token and call the createToken function.
+Pass in the user that has been found.
+We then need to pass in the secret, which will be stored in variables.env file.
+Create a SECRET string in variables.env .
+Then pass it in to the second param of the createToken function.
+Third param we will say we want expiresIn to be one hour:
+
+  return { token: createToken(user, process.env.SECRET, '1hr') };
+
+Then do the same for the signupUser function below:
+
+  return { token: createToken(newUser, process.env.SECRET, '1hr') };
+
+Now in graphql playground we can see a token returned with the signinUser mutation:
+
+  mutation {
+    signinUser(username: "secondUser", password: "secondUser") {
+      token
+    }
+  }
+
+Returns:
+
+  {
+    "data": {
+      "signinUser": {
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InNlY29uZFVzZXIiLCJlbWFpbCI6InNlY29uZFVzZXJAZ21haWwuY29tIiwiaWF0IjoxNTQ3MTAxMDExLCJleHAiOjE1NDcxMDQ2MTF9.IkKp_VWCBfmWJJ-xUXughAS_gqV6fwEMq_JjQXGkev0"
+      }
+    }
+  }
+
+##Using variables in GraphQL, signin / signup mutation definitions
+We can create variables in graphql to make it easier to change function values.
+For the signinUser mutation we need to provide username and password.
+They are strings and they are required:
+
+  mutation($username: String!, $password: String!) {
+    signinUser(username: $username, password: $password) {
+      token
+    }
+  }
+
+Then in the 'query variables' tab at the bottom supply the values:
+
+  {
+    "username": "secondUser",
+    "password": "secondUser"
+  }
+
+Copy this mutation and open up queries.js and create signin user mutation to export.
+
+  export const SIGNIN_USER = gql`
+  mutation($username: String!, $password: String!) {
+    signinUser(username: $username, password: $password) {
+      token
+    }
+  }
+  `;
+
+Then we can do the same for the signupUser mutation:
+
+  mutation($username: String!, $email: String!, $password: String!) {
+    signupUser(username: $username, email: $email, password: $password) {
+      token
+    }
+  }
+
+And create a new user in the query variables:
+
+  {
+    "username": "thirdUser",
+    "email": "thirdUser@gmail.com",
+    "password": "thirdUser"
+  }
+
+Then once again go to queries.js and create a mutation for signup user to export:
+
+  export const SIGNUP_USER = gql `
+    mutation($username: String!, $email: String!, $password: String!) {
+      signupUser(username: $username, email: $email, password: $password) {
+        token
+      }
+    }
+  `;
+
+Whenever we run these two mutations from the client we will be able to make use of graphql variables.
+
+##Add signin form, write and run signinUser action, return jwt
+Stop the server script and run the dev script.
+Lets make use of the siginin user mutation we just made.
+
+Open up the Signin.vue file.
+Create the signin form:
+
+  <template>
+    <v-container text-xs-center mt-5 pt-5>
+
+      <!-- Signin title -->
+      <v-layout row wrap>
+        <v-flex xs12 sm6 offset-sm3>
+          <h1>Welcome Back!</h1>
+        </v-flex>
+      </v-layout>
+
+      <!-- Signin form -->
+      <v-layout row wrap>
+        <v-flex xs12 sm6 offset-sm3>
+          <v-card color="secondary" dark>
+            <v-container>
+              <v-form>
+
+                <v-layout row>
+                  <v-flex xs12>
+                    <v-text-field v-model="username" prepend-icon="face" label="Username" type="username" required>
+                    </v-text-field>
+                  </v-flex>
+                </v-layout>
+
+                <v-layout row>
+                  <v-flex xs12>
+                    <v-text-field v-model="password" prepend-icon="lock" label="Password" type="password" required>
+                    </v-text-field>
+                  </v-flex>
+                </v-layout>
+
+                <v-layout row>
+                  <v-flex xs12>
+                    <v-btn color="accent" type="submit">Sign in</v-btn>
+                    <h3>Don't have an account?
+                      <router-link to="/signup">Sign up</router-link>
+                    </h3>
+                  </v-flex>
+                </v-layout>
+
+              </v-form>
+            </v-container>
+          </v-card>
+        </v-flex>
+      </v-layout>
+
+    </v-container>
+  </template>
+
+Create the username and password data properties and set them to empty strings:
+
+  data() {
+    return {
+      username: "",
+      password: ""
+    }
+  }
+
+Then create a method that will dispatch a signinUser action.
+We will call the action signinUser.
+Pass in the payload as the second arg the username and password:
+
+  methods : {
+    handleSigninUser() {
+      this.$store.dispatch('signinUser', {
+        username: this.username,
+        password: this.password
+      });
+    }
+  }
+
+On the form add @submit.prevent="handleSigninUser" to the v-form to prevent the default action of refreshing the page.
+
+Now we need to create a new action for this.
+Open up store.js and in the actions create a signinUser action.
+First arg is a commit object we can destructure and second arg is a payload which is the username and password we are passing along.
+We use the apolloClient and the mutate method on it.
+Specify in the object that its a mutation and give it the value of the SIGNIN_USER variable.
+Import SIGNIN_USER.
+We need to pass in the variables.
+Give it the value of payload object we are passing from our signin component.
+Once it resolves we can destructure the data object.
+It gives us access to the token returned.
+The object the token will be returned to will match the name of the function signinUser.
+Catch any errors:
+
+  signinUser: ({ commit }, payload) => {
+    apolloClient
+      .mutate({
+        mutation: SIGNIN_USER,
+        variables: payload
+      })
+      .then(({ data }) => {
+        console.log(data.signinUser);
+      })
+      .catch(err => {
+        console.error(err);
+      });
+  }
+
+Now when we signin we should see a token returned in the console which we can use to authenticate the user.
+
+##Additional config for ApolloClient, send token from local storage.
+We want to add the jwt to local storage as a key value pair.
+We will then send it to the ApolloServer to verify it as the token that was signed.
+
+Open up the store and set the token in the then statement in the signinUser action.
+The key value pait has a name of token and a value of the token we created:
+
+  .then(({ data }) => {
+    localStorage.setItem("token", data.signinUser.token);
+  })
+
+Sign in on the app.
+Then if we go to dev tools and under 'application' then local storage then localhost:8080.
+There should be a key value pair.
+
+Now we want to get this token out of local storage and make a request to the backend to send it to the backend.
+Make a fetchOptions object with a credentials property amd set it to include.
+We will be including some authorization information on the http header.
+
+Open up main.js and in the apolloClient check if there is a token in localStorage.
+If there isn't one set the token to a value of an empty string.
+
+Using the request property we add the token to the header and send it to the backend.
+The request property has a function and it takes operation as a param.
+Then we call a method on operation to set the context to put this token on a header that we'll send to the backend.
+On the operation call setContext method which takes an object.
+Set the headers property.
+Put the authorization header on the headers, get the token from local storage.
+
+Now include an onError property and function.
+We get access to graphQLErrors and networkError.
+If there is a network error log it.
+If there is a graphQLErrors then loop over it:
+
+
+  export const defaultClient = new ApolloClient({
+    uri: "http://localhost:4000/graphql",
+
+    // include the auth token with the requests made to the backend
+    fetchOptions: {
+      credentials: 'include'
+    },
+
+    request: operation => {
+      // if no token with key of 'token' in local storage, add it
+      if (!localStorage.token) {
+        localStorage.setItem('token', '')
+      }
+      // operation adds the token to an authorization header, which is sent to the backend
+      operation.setContext({
+        headers: {
+          authorization: localStorage.getItem('token')
+        }
+      })
+    },
+    onError: ({ graphQLErrors, networkError }) => {
+      if (networkError) {
+        console.log("[networkError]", networkError);
+      }
+
+      if (graphQLErrors) {
+        for (let err of graphQLErrors) {
+          console.dir(err);
+        }
+      }
+    }
+  });
+
+  ##Verify jwt token in server.js, pass result to currentUser in context
+  We are going to recieve the token in server.js in the ApolloServer context object.
+  Instead of having an object turn it into a function.
+  In the first param destructure the request made from apolloClient in main.js .
+  On the request we have the authorization header which has the token.
+  Create a token variable and set it to the authorization token from the header.
+  Return the User and Post so they are available to the context of the resolvers.
+  We will also make currentUser available that will get information about the user by validating the token:
+
+  const server = new ApolloServer({
+    typeDefs,
+    resolvers,
+    context: async ({ req }) => {
+      const token = req.headers["authorization"];
+      return { User, Post, currentUser: await getUser(token) };
+    }
+  });
+
+Import the jwt package.
+Then create the function getUser to validate the token.
+Check if there is a token asynchronously.
+If there is a token try to verify it.
+Use the the verify method and pass in the token and the SECRET.
+Assign the returned value to user.
+Catch any errors:
+
+  const getUser = async token => {
+    if (token) {
+      try {
+        let user = await jwt.verify(token, process.env.SECRET);
+        console.log(user);
+      } catch (err) {
+        console.log(err);
+      }
+    }
+  }
+
+Now when we sign in we should see in the console:
+
+{ username: 'thirdUser',
+[server]   email: 'thirdUser@gmail.com',
+[server]   iat: 1547174488,
+[server]   exp: 1547178088 }
+
+We can refactor the error using AuthenticationError package.
+Import the package:
+
+  const { ApolloServer, AuthenticationError } = require("apollo-server");
+
+Throw an AuthenticationError if there is an error:
+
+  catch (err) {
+    throw new AuthenticationError('Your session has ended. Please sign in again.');
+  }
+
+Next we pass this information to currentUser that we have available in the context.
+
+##Create getCurrentUser query, execute it from main.js
+We want to pass the getUser function to the context object via the current user statement.
+Remove the user variable in the getUser function and instead return the await statement.
+Now the token will be passed to currentUser.
+
+Then create a new query function in typeDefs.
+It'll be a function for handling the current users information.
+It'll return the user that corresponds to the currentUser information:
+
+  type Query {
+    getCurrentUser: User
+    getPosts: [Post]
+  }
+
+Then create the function in resolvers.
+We can destructure some objects from the context object.
+We need to use the User mongoose model.
+We can also grab the currentUser that is holding the token.
+If there isn't a value for current user return null.
+If there is then find the user from their username.
+Then use the populate method to return their favourite posts from the post model.
+Then return the user:
+
+  getCurrentUser: async (_, args, { User, currentUser }) => {
+    if (!currentUser) {
+      return null;
+    }
+    const user = await User.findOne({
+      username: currentUser.username
+    }).populate({
+      path: "favorites",
+      model: "Post"
+    });
+    return user;
+  }
+
+Go to the store and create an action for getCurrentUser.
+Destructure the commit.
+Set it to setLoading before we execute the query.
+Then use apolloClient to specify the query we want to use which we haven't created yet:
+
+  getCurrentUser: ({ commit }) => {
+    commit('setLoading', true);
+    apolloClient.query({
+      query: GET_CURRENT_USER
+    })
+  }
+
+So create in in the queries file.
+We aren't passing in any args.
+Then return everything in the User type.
+FOr the favorites refer to the Post type as it's an array  of posts:
+
+  export const GET_CURRENT_USER = gql `
+    query {
+      getCurrentUser {
+        _id
+        username
+        email
+        password
+        avatar
+        joindate
+        favorites {
+          _id
+          title
+          imageUrl
+        }
+      }
+    }
+  `;
+
+Then back in the store import this query.
+Back in the action for getCurrentUser pass a then statement and destructure the data.
+Now that the query has executed set the loading to false.
+Then make a catch block for errors:
+
+  getCurrentUser: ({ commit }) => {
+    commit('setLoading', true);
+    apolloClient.query({
+      query: GET_CURRENT_USER
+    })
+    .then(({ data }) => {
+      commit('setLoading', false);
+      console.log(data.getCurrentUser);
+    })
+    .catch(err => {
+      commit('setLoading', false);
+      console.error(err);
+    })
+  }
+
+Then go to main.js and create a created lifecycle hook in the vue instance.
+We will execute the getCurrentUser query so it will run on every page refresh.
+Then dispatch the name of the function as a string:
+
+  new Vue({
+    provide: apolloProvider.provide(),
+    router,
+    store,
+    render: h => h(App),
+    created() {
+      // execute getCurrentUser query
+      this.$store.dispatch('getCurrentUser');
+    }
+  }).$mount("#app");
+
+##Redirect home upon signin with watcher
+Once the signinUser mutation resolves we want to run the created method so we execute the getCurrentUser query on signing in automatically.
+To refresh the page we use the router.
+
+Go to the signinUser action in the store.
+Import the router from router.js:
+
+  import router from "./router";
+
+We refresh the page with the router and use the method 'go' on it:
+
+  .then(({ data }) => {
+    localStorage.setItem("token", data.signinUser.token);
+    router.go();
+  })
+
+Then within the getCurrentUser action we want to add the user data to the state.
+Add a new user property set to null:
+
+  state: {
+    posts: [],
+    user: null,
+    loading: false
+  }
+
+Then make a setUser mutation to set that property on the state.
+We set the user property to the payload we pass into it:
+
+  setUser: (state, payload) => {
+    state.user = payload;
+  }
+
+Then back in the getCurrentUser action use the commit function to reference setUser and pass in the user object as a payload to data.getCurrentUser:
+
+  .then(({ data }) => {
+    commit("setLoading", false);
+    commit("setUser", data.getCurrentUser);
+    console.log(data.getCurrentUser);
+  })
+
+Then in dev tools under the vue tab then under vuex there should be a user property.
+
+Now we want to redirect a signed in user to the home page.
+We need to get that user property on the state.
+In the Signin component import mapGetters:
+
+  import { mapGetters } from 'vuex';
+
+Create a new computed property.
+Use mapGetters to specify what getters we want, we want user:
+
+  computed: {
+    ...mapGetters(['user'])
+  }
+
+Then back in the store pass the user property back to the component with the getter:
+
+  getters: {
+    posts: state => state.posts,
+    user: state => state.user,
+    loading: state => state.loading
+  }
+
+Now setup a watcher.
+Watch for we the user value in the state changes from null.
+Create a watcher property with a method for watching the user data.
+It will accept a value and allow us to watch for changes with the computed property user.
+If user value changes then redirect to the home page.
+Use router.push to redirect:
+
+  watch: {
+    user(value) {
+      if (value) {
+        this.$router.push("/");
+      }
+    }
+  }
+
+##Change Navbar for signedin user
+We are going to change how the links appear depending on whether the user is authenticated or not.
+In the App component import mapGetters and pass in the user to the mapGetters helper.
+Call horizontalNavItems.
+Create a let variable 'items' and copy in the nav item objects into an array.
+If the user is authenticated then only display the 'posts' nav item:
+
+  ...mapGetters(['user']),
+  horizontalNavItems() {
+    let items = [
+      { icon: 'chat', title: 'Posts', link: '/posts'},
+      { icon: 'lock_open', title: 'Sign In', link: '/signin'},
+      { icon: 'create', title: 'Sign Up', link: '/signup'}
+    ];
+    if (this.user) {
+      items = [
+        { icon: 'chat', title: 'Posts', link: '/posts'}
+      ]
+    }
+    return items;
+  }
+
+Now we will modify the sideNavItems for a logged in user:
+
+  sideNavItems() {
+    let items = [
+      { icon: 'chat', title: 'Posts', link: '/posts'},
+      { icon: 'lock_open', title: 'Sign In', link: '/signin'},
+      { icon: 'create', title: 'Sign Up', link: '/signup'}
+    ];
+    if (this.user) {
+      items = [
+        { icon: 'chat', title: 'Posts', link: '/posts'},
+        { icon: 'create', title: 'Create Post', link: '/post/add'},
+        { icon: 'account_box', title: 'Profile', link: '/profile'}
+      ]
+    }
+    return items;
+  }
+
+Let's add a profile button and a signout button manually in the horizontal navbar items.
+This will be for a logged in user do check if there is a user.
+Make the icon invisible at the small break point.
+The badge will represent how many favorites the user has:
+
+  <v-btn flat to="/profile" v-if="user">
+    <v-icon class="hidden-sm-only" left>account_box</v-icon>
+    <v-badge right color="blue darken-2">
+      <span slot="badge">1</span>
+      Profile
+    </v-badge>
+  </v-btn>
+
+Then we can make the signout button:
+
+  <v-btn flat v-if="user">
+    <v-icon class="hidden-sm-only" left>exit_to_app</v-icon>
+    Signout
+  </v-btn>
+
+Add a signout button to the side nav bar links:
+
+  <v-list-tile v-if="user">
+    <v-list-tile-action>
+      <v-icon>exit_to_app</v-icon>
+    </v-list-tile-action>
+    <v-list-tile-content>Signout</v-list-tile-content>
+  </v-list-tile>
+
+##Create signout action
+We want to click on the signout buttons and deauthenticate the user.
+
+In the App component add 'handleSignoutUser' click event handlers to the signout buttons.
+Add the method that dispatches an action to the store called 'signoutUser':
+
+  handleSignoutUser() {
+    this.$store.dispatch('signoutUser');
+  }
+
+Then in the store create the signoutUser action.
+Destructure the commit object.
+Clear the user in state by commiting clearUser:
+
+  signoutUser: ({ commit }) => {
+    commit('clearUser');
+  }
+
+Create the clearUser mutation and it will look like a getter.
+We don't need access to a payload as we aren't passsing any data along.
+Set state,user equal to null:
+
+  clearUser: state => (state.user = null)
+
+Back in the signoutUser action remove token in local storage.
+Set the item of token to nothing:
+
+  localStorage.setItem('token', '');
+
+End the session with apolloClient.
+ApolloClient sets up a lot of information by default in memory cache and we need to reset it.
+Use resetStore method which needs to be asynchronous.
+Then once it is resolved redirect user to home page:
+
+  signoutUser: async ({ commit }) => {
+    commit('clearUser');
+    localStorage.setItem('token', '');
+    await apolloClient.resetStore();
+    router.push("/");
+  }
+
+##Protected routes and clearing malformed tokens
+If we have a token that isn't valid after logging in we can still see pages/links we shouldn't.
+So if we are logged in go to profile page, then invalidate the token we can still see the profile page.
+We can create protected routes that only authenticated user can access.
+
+Go to router.js and add 'beforeEnter' property on the profile route.
+Pass it 'AuthGuard' a function we will create:
+
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: Profile,
+    beforeEnter: AuthGuard
+  }
+
+Then make an AuthGuard.js file.
+We want to take the user information from within the store and check whether it contains a user.
+Import the store.
+Create an arrow function that we will export.
+It will have the params to, from, and next.
+We won't be using to or from, they allow us to set up conditions based on whether we are going to or from a certain route.
+So if there is no user in the store, redirect them to the signin route using the next function.
+Otherwise just call next:
+
+  import store from './store';
+
+  export default (to, from, next) => {
+    if (!store.getters.user) {
+      next({
+        path: '/signin'
+      });
+    } else {
+      next();
+    }
+  }
+
+Then import AuthGuard.js to router.js file.
+
+Now when we try access the profile page after invalidating the token it will redirect.
+However when we try signin we get status code 400 as its tring to use the invalid token to log in still.
+So we need to clear the token to be able to run the signin mutation again.
+
+In the signinUser action in the store set the token in local storage equal to an empty string:
+
+  localStorage.setItem("token", "");
+
+#Adding global form alert component
+In the store, in the signinUser action, in the catch statement, commit 'setError' as a new property in state:
+
+  .catch(err => {
+    commit('setError', err);
+    console.error(err);
+  });
+
+In the state create error and set to null.
+
+Then create the setError mutation taking in state and payload.
+Set the error property we just created in state to the payload error object from signinUser:
+
+  setError: (state, payload) => {
+    state.error = payload;
+  }
+
+So now if we try signing in without a password we should see a error object returned in the vuex console.
+We want to display this error to the user.
+Go to signin.vue and put it above the form.
+Use a 'form-alert' tag and pass it a message of error.message .
+Show it conditionally based on whether there is an error:
+
+  <v-layout v-if="error" row wrap>
+    <v-flex xs12 sm6 offset-sm3>
+      <form-alert :message="error.message"></form-alert>
+    </v-flex>
+  </v-layout>
+
+Under the components folder create a 'shared' folder.
+Inside that make a 'FormAlert.vue' file.
+We will use this template to pass an error for all circumstances.
+We pass it the prop 'message':
+
+<template>
+  <v-alert type="error" :value="true" transition="scale-transition" dismissible>
+    <h3>{{ message }}</h3>
+  </v-alert>
+</template>
+
+<script>
+  export default {
+    props: ['message']
+  }
+</script>
+
+Import and register this component globally in main.js:
+
+  import FormAlert from './components/Shared/FormAlert';
+
+  Vue.component('form-alert', FormAlert);
+
+Now we need to bring in the error from the state.
+Make a getter for it:
+
+  error: state => state.error
+
+Add the error to the mapGetters array in the signin component:
+
+  computed: {
+    ...mapGetters(['error', 'user'])
+  }
+
+Now if we try to signin without a password we get a dismissable error displayed.
+However once we clear the error and try doing the same thing, the error is not displayed even though we can see the error in the vuex dev tools.
+
+Go to the store and in the signinUser action and commit setError and set it to null.
+But lets make it so we can do the same thing but just by commiting 'clearError'.
+
+  commit('clearError');
+
+Create the clearError mutation and set the error property within state to null:
+
+  clearError: state => (state.error = null)
+
+Now the error message should display again after clearing it.
+
+##Add loading spinner to the Siginin button
+Grab a loading button from vuetifyjs and paste it where the signin button is.
+Copy and paste all the button css style into the component.
+
+Now we need to bring in formation about whrn the signin mutation is being loaded.
+Add a loading prop to v-btn.
+
+Go to the signinUser action and commit setLoading to true:
+
+  commit('setLoading', true);
+
+In the then statement and the catch statement when it's resolved set it to false.
+
+We already have a getter for loading so we don't need to make a getter for it.
+Bring it into the mapGetters array in the Signin component:
+
+  computed: {
+    ...mapGetters(['loading', 'error', 'user'])
+  }
+
+##Form validation with Vuetify in signin component
+Tell the user that a username is required.
+In the Signin component in the username text field, bind a rules prop and set it to 'usernameRules':
+
+  <v-text-field :rules="usernameRules" v-model="username" prepend-icon="face" label="Username" type="username" required>
+
+Set usernameRules in the data method.
+It will be an array of functions.
+username will check to see if there is a username provided:
+
+  data() {
+    return {
+      username: "",
+      password: "",
+      usernameRules: [
+        username => !!username || 'Username is required'
+      ]
+    };
+  }
+
+Now create a function to make sure the username is less than 10 chars:
+
+  data() {
+    return {
+      username: "",
+      password: "",
+      usernameRules: [
+        username => !!username || "Username is required",
+        username => username.length > 10 || "Username must be less than 10 characters"
+      ]
+    };
+  }
+
+Do the same for the password:
+
+  <v-text-field :rules="passwordRules" v-model="password" prepend-icon="lock" label="Password" type="password" required>
+
+  passwordRules: [
+    password => !!password || "Password is required",
+    password => password.length >= 7 || 'Password must be 7 charcters or more'
+  ]
+
+We need to disable the buttons if the passwordRules are not met.
+On the v-form set the v-model to "isFormValid":
+
+  <v-form :model="isFormValid" @submit.prevent="handleSigninUser">
+
+On the submit button add a disabled prop set to the opposite of isFormValid:
+
+  <v-btn type="submit" color="accent" :loading="loading" :disabled="!isFormValid" @click="loader = 'loading'">
+
+Set the data property for isFormValid to true.
+It will be changed to false if any of the rules aren't met.
+Add 'lazy-validation' to the form and set the ref to 'form':
+
+  <v-form :model="isFormValid" lazy-validation ref="form" @submit.prevent="handleSigninUser">
+
+Now the signin button should be disabled if the rules aren't met.
+However refreshing the page allows the submit button to be clicked.
+When we hit submit we run the handleSigninUser method.
+Check to see if the form validates:
+
+  methods : {
+    handleSigninUser() {
+      if(this.$refs.form.validate()) {
+        this.$store.dispatch('signinUser', {
+          username: this.username,
+          password: this.password
+        });
+      }
+    }
+  }
+
+##Show AuthSnackbar in Signin and Signup
+Showing a notification for a successful signin.
+Snackbar is a vuetify component.
+
+Put the Snackbar in the App component under the router-view transition:
+
+  <v-snackbar v-model="authSnackbar" color="success" :timeout="5000" bottom left>
+    <v-icon class="mr-3">check_circle</v-icon>
+    Signed in!
+    <v-btn dark flat @click="authSnackbar = false">
+      Close
+    </v-btn>
+  </v-snackbar>
+
+Add the 'authSnackbar' data property and set to true:
+
+  data() {
+    return {
+      sideNav: false,
+      authSnackbar: true
+    }
+  }
+
+We don't want it to show all the time and only when we have a user.
+Create a watcher for the user value.
+If there was no value for user previously then show the snackbar.
+We can do this by passing newValue and oldValue to the watcher.
+If the oldValue is equal to null then show the snackbar:
+
+  watch: {
+    user(newValue, oldValue) {
+      if (oldValue === null) {
+        this.authSnackbar = true;
+      }
+    }
+  }
+
+Then set the authSnackbar data property to false.
+
+##Handle authentication errors, show auth error snackbar
+Using the snackbar to show errors.
+If we malform a token we get an error in the console through the AuthenticationError.
+
+To get the name of the error, in server.js add 'formatError' to the ApolloServer initialization.
+This function takes the error argument.
+Then we can return the name of the error, and the error message:
+
+  formatError: error => ({
+    name: error.name,
+    message: error.message.replace('Context creation failed:', '')
+  })
+
+Now when we get an error we can use it easier.
+In main.js where we log the error check to see if there is an AuthenticationError.
+If there is then set AuthenticationError in state to show in snackbar.
+Commit 'setAuthError' mutation on the store and pass the error payload.
+Then signout user to clear the token.
+Dispatch the 'signoutUser' on the store to clear the token:
+
+  if (graphQLErrors) {
+    for (let err of graphQLErrors) {
+      console.dir(err);
+      if (err.name === "AuthenticationError") {
+        store.commit('setAuthError', err);
+        store.dispatch('signoutUser');
+      }
+    }
+  }
+
+In the store, set the authError data property to null.
+Then make the setAuthError mutation:
+
+  setAuthError: (state, payload) => {
+    state.authError = payload;
+  }
+
+Then make the getter for it:
+
+  authError: state => state.authError
+
+In the App component create a new snackbar for if there's an authErrorSnackbar.
+
+  <v-snackbar v-if="authError" v-model="authErrorSnackbar" color="info" :timeout="5000" bottom left>
+    <v-icon class="mr-3">cancel</v-icon>
+    {{ authError.message }}
+    <v-btn dark flat to="/signin">
+      Signin
+    </v-btn>
+  </v-snackbar>
+
+Set the authErrorSnackbar data property to false.
+Add the authError to the mapGetters.
+Make a new watcher for it.
+If the authError value isn't null then show the authErrorSnackbar:
+
+  authError(value) {
+    if (value != null) {
+      this.authErrorSnackbar = true;
+    }
+  }
+
+##Create signup form and signup user action
+Copy the template from the Signin component and paste it into a new Signup component.
+Convert the markup for signin purposes.
+
+Using lazy-validation with the form ref, make the submit button not clickable stright away.
+In the handleSignupUser method check if the form is valid.
+If so dispatch the signupUser action and pass the username email and password:
+
+  methods: {
+    handleSignupUser() {
+      if (this.$refs.form.validate()) {
+        this.$store.dispatch('signupUser', {
+          username: this.username,
+          email: this.email,
+          password: this.password
+        });
+      }
+    }
+  }
+
+Then create the signupUser action in the store.
+Copy the signinUser action.
+Change the mutation to SIGNUP_USER that we have already created.
+Import it.
+In the then statement set the token to signup user.
+
+We can remove the code where we clear the token in the signinUser and signupUser actions.
+
+Go the Signin component and copy the watcher.
+Then in the Signup component add user to the mapGetters.
+Paste in the watcher.
+If we have a user value then push to the home route:
+
+  watch: {
+    user(value) {
+      // if user value changes, redirect to home page
+      if (value) {
+        this.$router.push("/");
+      }
+    }
+  }
+
+Let's disable the signup button if the app is loading.
+In the Signup and Signin component:
+
+  <v-btn :loading="loading" :disabled="!isFormValid || loading" color="info" type="submit">
+
+##Make add post form
+Copy the template from the Signup component and paste into the AddPost component.
+Modify it accordingly.
+
+Set the form submit to handleAddPost:
+
+  <v-form v-model="isFormValid" lazy-validation ref="form" @submit.prevent="handleAddPost">
+
+Looking at the typeDefs the user needs to provide title, imageUrl, categories and description.
+Delete the v-layouts except for the username one.
+Change the rules to titleRules, the model to title, label to 'Post Title':
+
+  <v-layout row>
+    <v-flex xs12>
+      <v-text-field :rules="titleRules" v-model="title" label="Post Title" type="text" required></v-text-field>
+    </v-flex>
+  </v-layout>
+
+Do the same for imageUrl:
+
+  <v-layout row>
+    <v-flex xs12>
+      <v-text-field :rules="imageRules" v-model="imageUrl" label="Image URL" type="text" required></v-text-field>
+    </v-flex>
+  </v-layout>
+
+The let's make it so there's a preview of the image:
+
+  <v-layout row>
+    <v-flex xs12>
+      <img :src="imageUrl" height="300px">
+    </v-flex>
+  </v-layout>
+
+Next create some pre made categories for the user to select:
+
+  <v-layout row>
+    <v-flex xs12>
+      <v-select :rules="categoriesRules" v-model="categories" :items="['Art', 'Education', 'Travel', 'Photography', 'Technology', 'Financial', 'Social', 'News', 'Political', 'Gaming', 'Food and Drink', 'Shopping', 'Film and TV', 'Weather', 'Environment', 'Opinion', 'Humour', 'History', 'Future', 'Expert', 'Work']" multiple label="Categories">
+      </v-select>
+    </v-flex>
+  </v-layout>
+
+Create a text area for the description:
+
+  <v-layout row>
+    <v-flex xs12>
+      <v-textarea :rules="descRules" v-model="description" label="Description" type="text" required></v-textarea>
+    </v-flex>
+  </v-layout>
+
+Change the button to submit:
+
+  <v-layout row>
+    <v-flex xs12>
+      <v-btn :loading="loading" :disabled="!isFormValid || loading" color="info" type="submit">
+        <span slot="loader" class="custom-loader">
+          <v-icon light>cached</v-icon>
+        </span>
+        Submit</v-btn>
+    </v-flex>
+  </v-layout>
+
+Add data properties for the post properties:
+
+  data() {
+    return {
+      isFormValid: true,
+      title: '',
+      imageUrl: '',
+      categories: [],
+      description: ''
+    }
+  }
+
+**I've modified the categories to be displayed alphabetically:
+
+  <v-select :rules="categoriesRules" v-model="categories" :items="sortedCategories" multiple label="Categories">
+
+  computed: {
+    sortedCategories() {
+      const items = ['Art', 'Education', 'Travel', 'Photography', 'Technology', 'Financial', 'Social', 'News', 'Political', 'Gaming', 'Food and Drink', 'Shopping', 'Film and TV', 'Weather', 'Environment', 'Opinion', 'Humour', 'History', 'Future', 'Expert', 'Work'];
+      return items.sort();
+    }
+  }
+
+Then make the rules:
+
+  titleRules: [
+    title => !!title ||"Title is required",
+    title => title.length < 20 || "Title must be less than 20 characters"
+  ],
+  imageRules: [
+    image => !!image ||"Image url is required"
+  ],
+  categoriesRules: [
+    categories => categories.length >= 1 ||"One or more categories are required"
+  ],
+  descRules: [
+    desc => !!desc ||"Description is required",
+    desc => desc.length < 200 || "Description must be less than 200 characters"
+  ]
+
+**I've modified it so that the url input must start with 'https://':
+
+  pattern: /^((http|https|ftp):\/\/)/,
+
+  imageRules: [
+    image => !!image ||"Image url is required",
+    image => !!this.pattern.test(image) || "Please enter valid URL"
+  ]
+
+##Create and execute addPost action / mutation
+In router.js go to the AddPost route and add the AuthGuard to the route to make sure only authenticated users can access it.
+
+Then in the AddPost component create the handleAddPost method.
+Check if the form is valid.
+If so then dispatch addPost mutation with the payload defined for addPost typedef.
+For creatorId we need to be able to access the user.
+For this create a computed property and add user to the mapGetters along with loading:
+
+  import { mapGetters } from 'vuex';
+
+  ...mapGetters(['loading', 'user'])
+
+So then we can access the id of the user with this.user._id:
+
+  methods: {
+    handleAddPost() {
+      if (this.$refs.form.validate()) {
+        // add post action
+        this.$store.dispatch('addPost', {
+          title: this.title,
+          imageUrl: this.imageUrl,
+          categories: this.categories,
+          description: this.description,
+          creatorId: this.user._id
+        });
+      }
+    }
+  }
+
+Then in the store create the addPost action:
+
+  addPost: ({ commit }, payload) => {
+    apolloClient
+      .mutate({
+        mutation: ADD_POST,
+        variables: payload
+      })
+      .then(({ data }) => {
+        console.log(data.addPost);
+      })
+      .catch(err => {
+        console.err(err);
+      });
+      this.$router.push('/');
+  }
+
+Import ADD_POST.
+Then in the graphql playground make the addPost mutation:
+
+  mutation(
+    $title: String!,
+    $imageUrl: String!,
+    $categories: [String]!,
+    $description: String!,
+    $creatorId: ID!
+  ) {
+    addPost(
+      title: $title,
+      imageUrl: $imageUrl,
+      categories: $categories,
+      description: $description,
+      creatorId: $creatorId
+    ) {
+      _id
+      title
+      imageUrl
+      categories
+      description
+      createdDate
+    }
+  }
+
+Then in the query variables panel pass in some values with the id of the current logged in user:
+
+  {
+    "categories": "['Art']",
+    "title": "Abstract Art",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f0/Vassily_Kandinsky%2C_1923_-_Circles_in_a_Circle.jpg",
+    "description": "A neat painting by Kandinsky",
+    "creatorId": "5c36fda089767900e4203005"
+  }
+    
+Run the mutation and check for errors.
+Copy that entire mutation and paste it into ADD_POST in queries.js:
+
+  export const ADD_POST = gql `
+    mutation(
+      $title: String!,
+      $imageUrl: String!,
+      $categories: [String]!,
+      $description: String!,
+      $creatorId: ID!
+    ) {
+      addPost(
+        title: $title,
+        imageUrl: $imageUrl,
+        categories: $categories,
+        description: $description,
+        creatorId: $creatorId
+      ) {
+        _id
+        title
+        imageUrl
+        categories
+        description
+        createdDate
+      }
+    }
+  `
+
+##Update and optimistic response for addPost mutation
+We had to refresh the page to display the new post.
+Lets tell the apollo server that a mutation was executed and show it in the UI.
+
+In the store in the addPost action add an update property to the mutation.
+This function gives us access to a cache/store value and a destructured data value.
+We are going to take the information in the cache and add new information that was created from our mutation to it.
+
+Read the query we want to update.
+Grab information from the data object being returned from a succesful mutation by referencing the addPost property.
+Then we need to get the data for the query we want to have updated which is GET_POSTS.
+So then we have the GET_POSTS data array and then we have to tell how we want the data to look after executing this mutation.
+Access it with dat.getPosts then add it to the start of the array.
+Then we need to write back and update it with that value.
+Specify the query GET_POSTS and pass it the data:
+
+  .mutate({
+    mutation: ADD_POST,
+    variables: payload,
+    update: (cache, { data: { addPost } }) => {
+      const data = cache.readQuery({ query: GET_POSTS });
+      data.getPosts.unshift(addPost);
+      cache.writeQuery({
+        query: GET_POSTS,
+        data
+      }); 
+    }
+  })
+
+To have this data added immediatley add optimisticResponse.
+It tells apollo to update the data immediatley.
+Give it a typename of mutation.
+Tell that it will be the typename mutation on addPost.
+Give that the typename of Post as it's the Post model.
+To make sure there isn't any conflict for adding it to the array give the id a value of -1 to add it to the beginning of the array.
+Then use the spread operator on payload:
+
+  optimisticResponse: {
+    __typename: 'Mutatation',
+    addPost: {
+      __typename: 'Post',
+      _id: -1,
+      ...payload
+    }
+  }
+
+##Infinite scroll on posts page; add typeDef, resolver, and query
+Create the abiltiy for the user to request more posts when scrolling.
+
+In typeDefs create PostsPage and it will have posts as an array of posts.
+And it will then check it there are more posts:
+
+  type PostsPage {
+    posts: [Post]
+    hasMore: Boolean
+  }
+
+Create the infiniteScrollPosts query and set it to the PostsPage object.
+It needs the page we are on, and how many posts we want on each page:
+
+  type Query {
+    getCurrentUser: User
+    getPosts: [Post]
+    infiniteScrollPosts(pageNum: Int!, pageSize: Int!): PostsPage
+  }
+
+Then in resolvers create the infiniteScrollPosts query.
+Use async and destructure the pageNum and pageSize.
+Use the Post model.
